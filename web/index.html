@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StatusPing</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: #0f1117; color: #e6e6e6; }
+    header { padding: 20px 24px; border-bottom: 1px solid #222; display: flex; align-items: baseline; gap: 12px; }
+    header h1 { margin: 0; font-size: 20px; }
+    header .sub { color: #8a8f98; font-size: 13px; }
+    #dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #f04747; }
+    #dot.live { background: #43b581; }
+    .grid { display: grid; gap: 12px; padding: 24px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .card { background: #171a21; border: 1px solid #232833; border-left: 4px solid #43b581; border-radius: 8px; padding: 14px 16px; }
+    .card.down { border-left-color: #f04747; }
+    .card .name { font-weight: 600; }
+    .card .url { color: #6b7280; font-size: 12px; word-break: break-all; margin: 2px 0 10px; }
+    .card .meta { display: flex; justify-content: space-between; font-size: 13px; }
+    .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 8px; border-radius: 10px; background: #1f3d2b; color: #43b581; }
+    .badge.down { background: #3d1f1f; color: #f04747; }
+    .lat { color: #8a8f98; }
+  </style>
+</head>
+<body>
+  <header>
+    <span id="dot"></span>
+    <h1>StatusPing</h1>
+    <span class="sub">live service-uptime monitor</span>
+  </header>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script type="module">
+    import htm from 'https://unpkg.com/htm?module';
+    const html = htm.bind(React.createElement);
+    const { useState, useEffect } = React;
+
+    function Card({ s }) {
+      const cls = s.up ? 'card' : 'card down';
+      return html`<div class=${cls}>
+        <div class="name">${s.name}</div>
+        <div class="url">${s.url}</div>
+        <div class="meta">
+          <span class=${s.up ? 'badge' : 'badge down'}>${s.up ? 'up' : 'down'}</span>
+          <span class="lat">${s.latency_ms} ms${s.code ? ' · ' + s.code : ''}</span>
+        </div>
+      </div>`;
+    }
+
+    function App() {
+      const [items, setItems] = useState([]);
+      useEffect(() => {
+        const dot = document.getElementById('dot');
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${location.host}/ws`);
+        ws.onopen = () => dot.classList.add('live');
+        ws.onclose = () => dot.classList.remove('live');
+        ws.onmessage = (e) => setItems(JSON.parse(e.data).sort((a, b) => a.name.localeCompare(b.name)));
+        // fallback for initial paint if WS is slow
+        fetch('/api/status').then(r => r.json()).then(d => setItems(cur => cur.length ? cur : d.sort((a, b) => a.name.localeCompare(b.name)))).catch(() => {});
+        return () => ws.close();
+      }, []);
+      return html`<div class="grid">${items.map(s => html`<${Card} key=${s.name} s=${s} />`)}</div>`;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
+  </script>
+</body>
+</html>

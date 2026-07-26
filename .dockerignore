@@ -1,0 +1,6 @@
+web
+grafana
+*.md
+.git
+statusping
+*.exe

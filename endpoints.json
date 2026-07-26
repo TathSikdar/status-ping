@@ -1,0 +1,22 @@
+[
+  { "name": "google",        "url": "https://www.google.com" },
+  { "name": "github",        "url": "https://github.com" },
+  { "name": "github-api",    "url": "https://api.github.com" },
+  { "name": "cloudflare",    "url": "https://www.cloudflare.com" },
+  { "name": "wikipedia",     "url": "https://www.wikipedia.org" },
+  { "name": "stackoverflow", "url": "https://stackoverflow.com" },
+  { "name": "reddit",        "url": "https://www.reddit.com" },
+  { "name": "npm",           "url": "https://www.npmjs.com" },
+  { "name": "pypi",          "url": "https://pypi.org" },
+  { "name": "dockerhub",     "url": "https://hub.docker.com" },
+  { "name": "golang",        "url": "https://go.dev" },
+  { "name": "mozilla",       "url": "https://developer.mozilla.org" },
+  { "name": "amazon",        "url": "https://www.amazon.com" },
+  { "name": "microsoft",     "url": "https://www.microsoft.com" },
+  { "name": "apple",         "url": "https://www.apple.com" },
+  { "name": "netflix",       "url": "https://www.netflix.com" },
+  { "name": "youtube",       "url": "https://www.youtube.com" },
+  { "name": "httpbin",       "url": "https://httpbin.org/status/200" },
+  { "name": "example",       "url": "https://example.com" },
+  { "name": "bad-endpoint",  "url": "https://httpbin.org/status/500" }
+]
