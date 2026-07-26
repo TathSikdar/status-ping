@@ -72,5 +72,6 @@ compiler enforces it.
 
 - `GET /ws` — WebSocket stream of the full status snapshot each cycle.
 - `GET /api/status` — current snapshot (JSON; initial-load fallback).
+- `GET /api/history?name=<n>&hours=24` — uptime fraction + recent points for one endpoint (click a card in the dashboard to view).
 - `GET /metrics` — Prometheus metrics (`endpoint_up`, `endpoint_latency_seconds`).
 - `GET /healthz` — liveness.

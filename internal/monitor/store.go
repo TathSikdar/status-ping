@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
@@ -43,4 +44,48 @@ func (s *Store) Save(ctx context.Context, st Status) {
 		s.rdb.Set(ctx, "status:"+st.Name, b, 0)
 	}
 	s.hist.InsertOne(ctx, st) // history is best-effort; a dropped point isn't fatal
+}
+
+// HistoryResult is the uptime summary + recent points for one endpoint.
+type HistoryResult struct {
+	Name   string   `json:"name"`
+	Uptime float64  `json:"uptime"` // fraction up over the window, 0..1
+	Points []Status `json:"points"` // most-recent-last, capped
+}
+
+// History returns the uptime fraction and up to `limit` most-recent points
+// for an endpoint since `since`.
+// ponytail: two counts + a capped Find; add server-side bucketing only if a
+// window ever returns enough points to matter for the sparkline.
+func (s *Store) History(ctx context.Context, name string, since time.Time, limit int64) (HistoryResult, error) {
+	res := HistoryResult{Name: name, Points: []Status{}}
+	filter := bson.M{"name": name, "ts": bson.M{"$gte": since}}
+
+	total, err := s.hist.CountDocuments(ctx, filter)
+	if err != nil {
+		return res, err
+	}
+	if total > 0 {
+		upFilter := bson.M{"name": name, "ts": bson.M{"$gte": since}, "up": true}
+		up, err := s.hist.CountDocuments(ctx, upFilter)
+		if err != nil {
+			return res, err
+		}
+		res.Uptime = float64(up) / float64(total)
+	}
+
+	// newest `limit`, then reverse to chronological order for the sparkline
+	cur, err := s.hist.Find(ctx, filter,
+		options.Find().SetSort(bson.D{{Key: "ts", Value: -1}}).SetLimit(limit))
+	if err != nil {
+		return res, err
+	}
+	var pts []Status
+	if err := cur.All(ctx, &pts); err != nil {
+		return res, err
+	}
+	for i := len(pts) - 1; i >= 0; i-- {
+		res.Points = append(res.Points, pts[i])
+	}
+	return res, nil
 }

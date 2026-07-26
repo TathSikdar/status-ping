@@ -22,6 +22,9 @@
     .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 8px; border-radius: 10px; background: #1f3d2b; color: #43b581; }
     .badge.down { background: #3d1f1f; color: #f04747; }
     .lat { color: #8a8f98; }
+    .detail { margin: 20px 24px 0; padding: 16px; background: #171a21; border: 1px solid #232833; border-radius: 8px; }
+    .detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .detail-head button { margin-left: auto; background: #232833; color: #e6e6e6; border: 1px solid #333; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -39,9 +42,9 @@
     const html = htm.bind(React.createElement);
     const { useState, useEffect } = React;
 
-    function Card({ s }) {
+    function Card({ s, onClick }) {
       const cls = s.up ? 'card' : 'card down';
-      return html`<div class=${cls}>
+      return html`<div class=${cls} style="cursor:pointer" onClick=${onClick} title="click for history">
         <div class="name">${s.name}</div>
         <div class="url">${s.url}</div>
         <div class="meta">
@@ -51,8 +54,44 @@
       </div>`;
     }
 
+    // Sparkline: latency over the recent points, down-checks drawn red.
+    function Sparkline({ points }) {
+      const W = 480, H = 80, pad = 4;
+      const lats = points.map(p => p.latency_ms);
+      const max = Math.max(1, ...lats);
+      const x = i => pad + (i * (W - 2 * pad)) / Math.max(1, points.length - 1);
+      const y = v => H - pad - (v * (H - 2 * pad)) / max;
+      const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.latency_ms).toFixed(1)}`).join(' ');
+      return html`<svg width=${W} height=${H} style="max-width:100%">
+        <polyline fill="none" stroke="#4a9eff" stroke-width="1.5" points=${line} />
+        ${points.map((p, i) => html`<circle key=${i} cx=${x(i)} cy=${y(p.latency_ms)} r="2"
+          fill=${p.up ? '#43b581' : '#f04747'} />`)}
+      </svg>`;
+    }
+
+    function Detail({ name, onClose }) {
+      const [data, setData] = useState(null);
+      useEffect(() => {
+        setData(null);
+        fetch(`/api/history?name=${encodeURIComponent(name)}&hours=24`)
+          .then(r => r.json()).then(setData).catch(() => setData({ points: [], uptime: 0 }));
+      }, [name]);
+      if (!data) return html`<div class="detail">loading ${name}…</div>`;
+      return html`<div class="detail">
+        <div class="detail-head">
+          <strong>${name}</strong>
+          <span class="lat">${(data.uptime * 100).toFixed(2)}% uptime · last 24h · ${data.points.length} checks</span>
+          <button onClick=${onClose}>close</button>
+        </div>
+        ${data.points.length
+          ? html`<${Sparkline} points=${data.points} />`
+          : html`<div class="lat">no history yet</div>`}
+      </div>`;
+    }
+
     function App() {
       const [items, setItems] = useState([]);
+      const [selected, setSelected] = useState(null);
       useEffect(() => {
         const dot = document.getElementById('dot');
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -64,7 +103,12 @@
         fetch('/api/status').then(r => r.json()).then(d => setItems(cur => cur.length ? cur : d.sort((a, b) => a.name.localeCompare(b.name)))).catch(() => {});
         return () => ws.close();
       }, []);
-      return html`<div class="grid">${items.map(s => html`<${Card} key=${s.name} s=${s} />`)}</div>`;
+      return html`<div>
+        ${selected && html`<${Detail} name=${selected} onClose=${() => setSelected(null)} />`}
+        <div class="grid">
+          ${items.map(s => html`<${Card} key=${s.name} s=${s} onClick=${() => setSelected(s.name)} />`)}
+        </div>
+      </div>`;
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
