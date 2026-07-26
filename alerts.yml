@@ -1,0 +1,19 @@
+groups:
+  - name: statusping
+    rules:
+      - alert: EndpointDown
+        expr: endpoint_up == 0
+        for: 45s # ~3 consecutive 15s checks, mirroring the Sentry paging threshold
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.endpoint }} is down"
+          description: "{{ $labels.endpoint }} has failed its health check for 45s."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum by (endpoint, le) (rate(endpoint_latency_seconds_bucket[5m]))) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.endpoint }} p95 latency > 2s"
