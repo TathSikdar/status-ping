@@ -105,6 +105,10 @@ func (m *Monitor) PollAll(ctx context.Context) {
 		m.store.Save(ctx, st)
 
 		if st.Up {
+			// Recovered: notify once if we'd previously paged for this endpoint.
+			if m.fails[st.Name] >= failThreshold {
+				sentry.CaptureMessage("endpoint recovered: " + st.Name + " (" + st.URL + ")")
+			}
 			m.fails[st.Name] = 0
 			continue
 		}
