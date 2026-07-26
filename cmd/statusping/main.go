@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -22,7 +24,9 @@ func env(key, def string) string {
 }
 
 func main() {
-	ctx := context.Background()
+	// Cancel everything on SIGINT/SIGTERM so `docker stop` shuts down cleanly.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	eps, err := monitor.LoadEndpoints(env("ENDPOINTS_FILE", "endpoints.json"))
 	if err != nil {
@@ -48,9 +52,16 @@ func main() {
 
 	interval, _ := time.ParseDuration(env("POLL_INTERVAL", "15s"))
 	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
 		mon.PollAll(ctx) // poll immediately, then on the tick
-		for range time.Tick(interval) {
-			mon.PollAll(ctx)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				mon.PollAll(ctx)
+			}
 		}
 	}()
 
@@ -62,7 +73,17 @@ func main() {
 	})
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 
-	addr := env("ADDR", ":8080")
-	log.Printf("listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	srv := &http.Server{Addr: env("ADDR", ":8080")}
+	go func() {
+		log.Printf("listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("shutting down")
+	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(shutCtx)
 }
