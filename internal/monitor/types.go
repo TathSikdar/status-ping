@@ -2,10 +2,13 @@ package monitor
 
 import "time"
 
-// Endpoint is one target to poll.
+// Endpoint is one target to poll. ExpectStatus/ExpectBody are optional
+// assertions: a 200 with the wrong body is still an outage.
 type Endpoint struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	Name         string `json:"name"`
+	URL          string `json:"url"`
+	ExpectStatus int    `json:"expect_status,omitempty"` // exact code; 0 means "any 2xx/3xx"
+	ExpectBody   string `json:"expect_body,omitempty"`   // required substring in the response body
 }
 
 // Status is the result of a single probe. Shared by WS, Redis, and Mongo.

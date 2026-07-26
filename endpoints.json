@@ -16,7 +16,7 @@
   { "name": "apple",         "url": "https://www.apple.com" },
   { "name": "netflix",       "url": "https://www.netflix.com" },
   { "name": "youtube",       "url": "https://www.youtube.com" },
-  { "name": "httpbin",       "url": "https://httpbin.org/status/200" },
-  { "name": "example",       "url": "https://example.com" },
+  { "name": "httpbin",       "url": "https://httpbin.org/status/200", "expect_status": 200 },
+  { "name": "example",       "url": "https://example.com", "expect_body": "Example Domain" },
   { "name": "bad-endpoint",  "url": "https://httpbin.org/status/500" }
 ]

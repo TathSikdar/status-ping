@@ -1,8 +1,11 @@
 package monitor
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -46,7 +49,8 @@ func NewMonitor(eps []Endpoint, store *Store, hub *Hub) *Monitor {
 	}
 }
 
-// probe does one HTTP GET and reports up/down + latency.
+// probe does one HTTP GET and reports up/down + latency, honouring the
+// endpoint's optional status/body assertions.
 func (m *Monitor) probe(ctx context.Context, e Endpoint) Status {
 	st := Status{Name: e.Name, URL: e.URL, Ts: time.Now().UTC()}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, e.URL, nil)
@@ -57,9 +61,26 @@ func (m *Monitor) probe(ctx context.Context, e Endpoint) Status {
 		st.Error = err.Error()
 		return st
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	st.Code = resp.StatusCode
-	st.Up = resp.StatusCode < 400
+
+	if e.ExpectStatus != 0 {
+		st.Up = resp.StatusCode == e.ExpectStatus
+	} else {
+		st.Up = resp.StatusCode < 400
+	}
+	if !st.Up {
+		st.Error = fmt.Sprintf("unexpected status %d", resp.StatusCode)
+		return st
+	}
+
+	if e.ExpectBody != "" {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // cap body read at 1MB
+		if !bytes.Contains(body, []byte(e.ExpectBody)) {
+			st.Up = false
+			st.Error = "body missing expected content"
+		}
+	}
 	return st
 }
 
